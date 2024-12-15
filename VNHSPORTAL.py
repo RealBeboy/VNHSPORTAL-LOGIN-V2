@@ -68,7 +68,7 @@ def process_account(url, browser_choice):
         raise ValueError(f"Binary location for {browser_choice} is not set.")
 
     # Set up browser-specific options
-    service = Service(os.path.join(script_dir, 'chromedriver.exe')) if browser_choice == "Brave" else Service(os.path.join(script_dir, 'msedgedriver.exe'))
+    service = Service(os.path.join(script_dir, 'chromedriver.exe')) if browser_choice == "Brave/Chrome" else Service(os.path.join(script_dir, 'msedgedriver.exe'))
     options = Options()
     options.binary_location = binary_path
 
@@ -182,14 +182,14 @@ password_entry = ttk.Entry(root, show="*", font=("Arial", 12))  # Asterisks hide
 password_entry.pack(pady=5)
 
 # Dropdown for browser choice
-browser_var = tk.StringVar(value="Brave")
+browser_var = tk.StringVar(value="Brave/Chrome")
 browser_var.trace("w", update_binary_label)
 
 browser_label = ttk.Label(root, text="Choose Browser:", background="#D6EAF8", font=("Arial", 12))
 browser_label.pack(pady=5)
 
 browser_dropdown = ttk.Combobox(root, textvariable=browser_var, state="readonly", font=("Arial", 12))
-browser_dropdown['values'] = ("Brave", "Edge")
+browser_dropdown['values'] = ("Brave/Chrome", "Edge")
 browser_dropdown.pack(pady=5)
 
 # Binary location label
