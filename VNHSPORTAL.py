@@ -11,6 +11,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import subprocess
 
 # Get the current directory where the script is located
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -87,29 +88,26 @@ def process_account(url, browser_choice):
     driver.quit()
     return url  # Return the URL of the successfully logged-in account
 
-def set_binary():
-    browser_choice = browser_var.get()
-    binary_path = filedialog.askopenfilename(title=f"Select binary for {browser_choice}", filetypes=[("Executables", "*.exe")])
-
-    if binary_path:
-        config[browser_choice] = binary_path
-        save_config(config)
-        binary_label_var.set(f"Binary Location: {binary_path}")
-        messagebox.showinfo("Success", f"Binary location for {browser_choice} has been set.")
-
-def reset_config():
-    if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the configuration?"):
-        if os.path.exists(config_path):
-            os.remove(config_path)
-        config.clear()
-        binary_label_var.set("Binary Location: Not Set")
-        messagebox.showinfo("Reset", "Configuration has been reset.")
-
-def update_binary_label(*args):
-    browser_choice = browser_var.get()
-    binary_label_var.set(f"Binary Location: {config.get(browser_choice, 'Not Set')}")
+def get_connected_ssid():
+    """
+    Retrieves the SSID of the currently connected Wi-Fi network.
+    Works on Windows using the 'netsh' command.
+    """
+    try:
+        output = subprocess.check_output(['netsh', 'wlan', 'show', 'interfaces'], text=True)
+        for line in output.splitlines():
+            if "SSID" in line:
+                return line.split(":", 1)[1].strip()
+    except Exception as e:
+        print(f"Error fetching SSID: {e}")
+    return None
 
 def login():
+    ssid = get_connected_ssid()
+    if ssid != "VNHS PORTAL":
+        messagebox.showerror("Connection Error", "Make sure you are connected to 'VNHS PORTAL'.")
+        return
+
     username = username_entry.get()
     password = password_entry.get()
     browser_choice = browser_var.get()
@@ -134,6 +132,28 @@ def login():
     # Add a message to the GUI after login
     success_label = ttk.Label(root, text="Login successful!", background="#D6EAF8", font=("Arial", 12))
     success_label.pack(pady=10)
+
+def set_binary():
+    browser_choice = browser_var.get()
+    binary_path = filedialog.askopenfilename(title=f"Select binary for {browser_choice}", filetypes=[("Executables", "*.exe")])
+
+    if binary_path:
+        config[browser_choice] = binary_path
+        save_config(config)
+        binary_label_var.set(f"Binary Location: {binary_path}")
+        messagebox.showinfo("Success", f"Binary location for {browser_choice} has been set.")
+
+def reset_config():
+    if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the configuration?"):
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        config.clear()
+        binary_label_var.set("Binary Location: Not Set")
+        messagebox.showinfo("Reset", "Configuration has been reset.")
+
+def update_binary_label(*args):
+    browser_choice = browser_var.get()
+    binary_label_var.set(f"Binary Location: {config.get(browser_choice, 'Not Set')}")
 
 # Create the main window
 root = tk.Tk()
