@@ -1,8 +1,9 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog, messagebox
 import getpass
 import time
 import os
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -13,6 +14,20 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Get the current directory where the script is located
 script_dir = os.path.dirname(os.path.realpath(__file__))
+config_path = os.path.join(script_dir, "browser_config.json")
+
+def load_config():
+    if os.path.exists(config_path):
+        with open(config_path, "r") as file:
+            return json.load(file)
+    return {}
+
+def save_config(config):
+    with open(config_path, "w") as file:
+        json.dump(config, file, indent=4)
+
+# Load existing configuration
+config = load_config()
 
 def wait_for_page_load(driver):
     while driver.execute_script("return document.readyState;") != "complete":
@@ -27,7 +42,7 @@ def check_login(driver, url):
         no_more_sessions_xpath = "/html/body/section/div/div[2]/div"
         try:
             no_sessions = driver.find_element(By.XPATH, no_more_sessions_xpath)
-            print(f"Account at {url}: No more sessions allowed.")
+            print(f"Account at {username}: No more sessions allowed.")
             driver.refresh()  # Refresh if this message appears
             time.sleep(0.1)
             return False  # Login failed, retry after refresh
@@ -39,22 +54,22 @@ def check_login(driver, url):
         login_message = WebDriverWait(driver, 0.1).until(
             EC.presence_of_element_located((By.XPATH, login_xpath))
         )
-        print(f"Account at {url}: Login successful.")
+        print(f"Account at {username}: Login successful.")
         return True  # Login successful
     except Exception as e:
-        print(f"Account at {url}: Error during login check: {e}")
+        print(f"Account at {username}: Error during login check: {e}")
         return False
 
 def process_account(url, browser_choice):
+    binary_path = config.get(browser_choice)
+
+    if not binary_path:
+        raise ValueError(f"Binary location for {browser_choice} is not set.")
+
     # Set up browser-specific options
-    if browser_choice == "Brave":
-        service = Service(os.path.join(script_dir, 'chromedriver.exe'))
-        options = Options()
-        options.binary_location = r"C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
-    elif browser_choice == "Edge":
-        service = Service(os.path.join(script_dir, 'msedgedriver.exe'))
-        options = Options()
-        options.binary_location = r"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    service = Service(os.path.join(script_dir, 'chromedriver.exe')) if browser_choice == "Brave" else Service(os.path.join(script_dir, 'msedgedriver.exe'))
+    options = Options()
+    options.binary_location = binary_path
 
     options.add_argument("--headless")  # Run in background
     options.add_argument("--disable-gpu")
@@ -72,10 +87,36 @@ def process_account(url, browser_choice):
     driver.quit()
     return url  # Return the URL of the successfully logged-in account
 
+def set_binary():
+    browser_choice = browser_var.get()
+    binary_path = filedialog.askopenfilename(title=f"Select binary for {browser_choice}", filetypes=[("Executables", "*.exe")])
+
+    if binary_path:
+        config[browser_choice] = binary_path
+        save_config(config)
+        binary_label_var.set(f"Binary Location: {binary_path}")
+        messagebox.showinfo("Success", f"Binary location for {browser_choice} has been set.")
+
+def reset_config():
+    if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the configuration?"):
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        config.clear()
+        binary_label_var.set("Binary Location: Not Set")
+        messagebox.showinfo("Reset", "Configuration has been reset.")
+
+def update_binary_label(*args):
+    browser_choice = browser_var.get()
+    binary_label_var.set(f"Binary Location: {config.get(browser_choice, 'Not Set')}")
+
 def login():
     username = username_entry.get()
     password = password_entry.get()
     browser_choice = browser_var.get()
+
+    if browser_choice not in config:
+        messagebox.showerror("Error", f"Binary location for {browser_choice} is not set.")
+        return
 
     # Construct the URL using the user input
     url = f"http://vnhs.portal/login?&username={username}&password={password}"
@@ -85,7 +126,7 @@ def login():
 
         for future in as_completed(futures):
             url = future.result()
-            print(f"Login successful for {url}, stopping other checks.")
+            print(f"Login successful for {username}, stopping other checks.")
             for future in futures:
                 future.cancel()
             break
@@ -97,7 +138,7 @@ def login():
 # Create the main window
 root = tk.Tk()
 root.title("VNHS Portal Auto Login")
-root.geometry("700x500")
+root.geometry("700x600")
 root.configure(bg="#D6EAF8")  # Light blue background
 
 # Header label
@@ -122,6 +163,7 @@ password_entry.pack(pady=5)
 
 # Dropdown for browser choice
 browser_var = tk.StringVar(value="Brave")
+browser_var.trace("w", update_binary_label)
 
 browser_label = ttk.Label(root, text="Choose Browser:", background="#D6EAF8", font=("Arial", 12))
 browser_label.pack(pady=5)
@@ -130,8 +172,24 @@ browser_dropdown = ttk.Combobox(root, textvariable=browser_var, state="readonly"
 browser_dropdown['values'] = ("Brave", "Edge")
 browser_dropdown.pack(pady=5)
 
+# Binary location label
+binary_label_var = tk.StringVar(value="Binary Location: Not Set")
+binary_label = ttk.Label(root, textvariable=binary_label_var, background="#D6EAF8", font=("Arial", 12))
+binary_label.pack(pady=5)
+
+# Button to set binary location
+set_binary_button = ttk.Button(root, text="Set Binary Location", command=set_binary)
+set_binary_button.pack(pady=10)
+
+# Button to reset configuration
+reset_button = ttk.Button(root, text="Reset Configuration", command=reset_config)
+reset_button.pack(pady=10)
+
 # Button to trigger login
 login_button = ttk.Button(root, text="Login", command=login)
 login_button.pack(pady=20)
+
+# Initialize binary label based on config
+update_binary_label()
 
 root.mainloop()
