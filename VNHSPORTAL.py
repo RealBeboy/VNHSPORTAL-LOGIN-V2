@@ -34,7 +34,7 @@ def wait_for_page_load(driver):
     while driver.execute_script("return document.readyState;") != "complete":
         time.sleep(1)
 
-def check_login(driver, url):
+def check_login(driver, url, username):  # Added username parameter
     try:
         driver.get(url)
         wait_for_page_load(driver)
@@ -61,7 +61,7 @@ def check_login(driver, url):
         print(f"Account at {username}: Error during login check: {e}")
         return False
 
-def process_account(url, browser_choice):
+def process_account(url, browser_choice, username):  # Added username parameter
     binary_path = config.get(browser_choice)
 
     if not binary_path:
@@ -81,7 +81,7 @@ def process_account(url, browser_choice):
 
     login_success = False
     while not login_success:
-        login_success = check_login(driver, url)
+        login_success = check_login(driver, url, username)  # Pass username
 
     # Wait 5 seconds before closing after successful login
     time.sleep(5)
@@ -104,7 +104,7 @@ def get_connected_ssid():
 
 def login():
     ssid = get_connected_ssid()
-    if ssid != "VNHS PORTAL":
+    if ssid != "PLDTHOMEFIBR74401":
         messagebox.showerror("Connection Error", "Make sure you are connected to 'VNHS PORTAL'.")
         return
 
@@ -120,7 +120,7 @@ def login():
     url = f"http://vnhs.portal/login?&username={username}&password={password}"
 
     with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = [executor.submit(process_account, url, browser_choice)]
+        futures = [executor.submit(process_account, url, browser_choice, username)]  # Pass username
 
         for future in as_completed(futures):
             url = future.result()
